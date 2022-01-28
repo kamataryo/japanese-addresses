@@ -685,6 +685,14 @@ const main = async () => {
 
   const prefCodeArray = process.argv[2] ? [process.argv[2]] : Array.from(Array(47), (v, k) => k + 1)
 
+  const versions = [
+    // NOTE: 古いバージョンはカラムが違うようだ
+    // { oazaVersion: '11.0b', gaikuVersion: '16.0a' },
+    // { oazaVersion: '12.0b', gaikuVersion: '17.0a' },
+    { oazaVersion: '13.0b', gaikuVersion: '18.0a' },
+    { oazaVersion: '14.0b', gaikuVersion: '19.0a' },
+  ]
+
   const downloadQueue = async.queue(async ({ prefCode, prefix }) => {
     const outPath = path.join(dataDir, `nlftp_mlit_${prefix}_${prefCode}.csv`)
     if (!fs.existsSync(outPath)) {
@@ -694,10 +702,10 @@ const main = async () => {
 
   prefCodeArray.forEach(prefNumber => {
     const prefCode = toPrefCode(prefNumber)
-    downloadQueue.push({ prefCode, prefix: '13.0b' })
-    downloadQueue.push({ prefCode, prefix: '18.0a' })
-    downloadQueue.push({ prefCode, prefix: '14.0b' })
-    downloadQueue.push({ prefCode, prefix: '19.0a' })
+    versions.forEach(version => {
+      downloadQueue.push({ prefCode, prefix: version.oazaVersion })
+      downloadQueue.push({ prefCode, prefix: version.gaikuVersion })
+    })
   })
 
   const outfile = await fs.promises.open(path.join(dataDir, 'latest.csv'), 'w')
@@ -726,23 +734,18 @@ const main = async () => {
   for (let i = 0; i < prefCodeArray.length; i++) {
     const prefCode = toPrefCode(prefCodeArray[i])
     const tp0 = performance.now()
-    const data1 = await getAddressItems(
+
+    const dataSets = await Promise.all(versions.map(version => getAddressItems(
       prefCode,
-      { oazaVersion: '13.0b', gaikuVersion: '18.0a' },
+      version,
       postalCodeKanaItems,
       postalCodeRomeItems,
-    )
-    const data2 = await getAddressItems(
-      prefCode,
-      { oazaVersion: '14.0b', gaikuVersion: '19.0a' },
-      postalCodeKanaItems,
-      postalCodeRomeItems,
-    )
+    )))
+
     const tp1 = performance.now()
     console.log(`${prefCode}: build took ` + (tp1 - tp0) + ' milliseconds.')
 
-    outfileWriterQueue.push(Object.values(data1.records))
-    outfileWriterQueue.push(Object.values(data2.records))
+    dataSets.forEach(data => outfileWriterQueue.push(Object.values(data.records)))
   } // pref loop
 
   await outfileWriterQueue.drain()
