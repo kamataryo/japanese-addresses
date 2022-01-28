@@ -34,7 +34,7 @@ src/config.json
 yarn.lock
 
 /data/*
-!/data/latest.csv
+# !/data/latest.csv
 !/data/latest_v2.csv
 !/data/patch.json
 
